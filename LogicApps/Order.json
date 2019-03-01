@@ -1,0 +1,166 @@
+{
+    "$connections": {
+        "value": {
+            "office365": {
+                "connectionId": "/subscriptions/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/resourceGroups/ABC/providers/Microsoft.Web/connections/office365",
+                "connectionName": "office365",
+                "id": "/subscriptions/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/providers/Microsoft.Web/locations/westus/managedApis/office365"
+            }
+        }
+    },
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Condition": {
+                "actions": {
+                    "If_request_approved": {
+                        "actions": {
+                            "Send_an_email": {
+                                "inputs": {
+                                    "body": {
+                                        "Body": "Please attend @{body('HttpTrigger1')}",
+                                        "Subject": "New Service Request",
+                                        "To": "aaaaa@contoso.com"
+                                    },
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['office365']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "path": "/Mail"
+                                },
+                                "runAfter": {},
+                                "type": "ApiConnection"
+                            }
+                        },
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@body('Send_approval_email')?['SelectedOption']",
+                                        "Approve"
+                                    ]
+                                }
+                            ]
+                        },
+                        "runAfter": {
+                            "Send_approval_email": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "If"
+                    },
+                    "Send_approval_email": {
+                        "inputs": {
+                            "body": {
+                                "Message": {
+                                    "Body": "The user @{triggerBody()?['userName']} with email @{triggerBody()?['userMail']} has requested a service for client @{triggerBody()?['clientId']} with a price of @{triggerBody()?['price']}.",
+                                    "Importance": "Normal",
+                                    "Options": "Approve, Reject",
+                                    "Subject": "Approval Request",
+                                    "To": "user@contoso.com"
+                                },
+                                "NotificationUrl": "@{listCallbackUrl()}"
+                            },
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['office365']['connectionId']"
+                                }
+                            },
+                            "path": "/approvalmail/$subscriptions"
+                        },
+                        "limit": {
+                            "timeout": "PT5M"
+                        },
+                        "runAfter": {},
+                        "type": "ApiConnectionWebhook"
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@outputs('HttpTrigger1')['statusCode']",
+                                200
+                            ]
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Response": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "If"
+            },
+            "HttpTrigger1": {
+                "inputs": {
+                    "body": "@triggerBody()",
+                    "function": {
+                        "id": "/subscriptions/XXXXXXXXXXXXXXXXXXXXXXXXXXXXX/resourceGroups/ABC/providers/Microsoft.Web/sites/CreateOrder/functions/HttpTrigger1"
+                    },
+                    "retryPolicy": {
+                        "type": "none"
+                    }
+                },
+                "runAfter": {},
+                "type": "Function"
+            },
+            "Response": {
+                "inputs": {
+                    "body": "@body('HttpTrigger1')",
+                    "statusCode": "@outputs('HttpTrigger1')['statusCode']"
+                },
+                "kind": "Http",
+                "runAfter": {
+                    "HttpTrigger1": [
+                        "Succeeded",
+                        "Failed",
+                        "Skipped",
+                        "TimedOut"
+                    ]
+                },
+                "type": "Response"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "method": "POST",
+                    "schema": {
+                        "properties": {
+                            "clientId": {
+                                "type": "string"
+                            },
+                            "price": {
+                                "type": "number"
+                            },
+                            "userId": {
+                                "type": "string"
+                            },
+                            "userMail": {
+                                "type": "string"
+                            },
+                            "userName": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "kind": "Http",
+                "operationOptions": "EnableSchemaValidation",
+                "type": "Request"
+            }
+        }
+    }
+}
